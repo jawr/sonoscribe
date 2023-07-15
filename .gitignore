@@ -1,4 +1,8 @@
 ebooks/
+extracts/
 summaries/
+audiobooks/
+wavs/
 piper/
 piper-voices/
+.DS_Store
