@@ -27,6 +27,8 @@ torchvision = {version = "*", index = "downloadpytorch"}
 torchaudio = {version = "*", index = "downloadpytorch"}
 pydub = "*"
 mutagen = "*"
+pdftotext = "*"
+pdf2image = "*"
 
 [dev-packages]
 

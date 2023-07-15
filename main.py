@@ -1,18 +1,53 @@
+from io import BytesIO
 import os
 import sys
 import subprocess
+import pdftotext
 from bs4 import BeautifulSoup
 from ebooklib import ITEM_DOCUMENT, epub
 from mutagen.mp4 import MP4Cover
 from textsum.summarize import Summarizer
 from pydub import AudioSegment
 from mutagen.mp4 import MP4, MP4Cover
+from pdf2image import pdf2image
 
 # name of the model to use for summarization
 SUMMARY_MODEL_NAME = "pszemraj/long-t5-tglobal-base-16384-booksci-summary-v1"
 
 # token batch length to use for summarization
 SUMMARY_TOKEN_BATCH_LENGTH = 3072
+
+
+def extract_text_from_pdf(pdf_path: str, output_file: str) -> dict:
+    metadata = {}
+
+    filename = get_filename_from_path(pdf_path)
+
+    metadata["title"] = filename.split("-")[1].replace("_", " ").strip()
+    metadata["autor"] = filename.split("-")[0].replace("_", " ").strip()
+
+    with open(pdf_path, "rb") as file:
+        pdf = pdftotext.PDF(file)
+        text = "\n\n".join(pdf)
+
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(text)
+
+    images = pdf2image.convert_from_path(pdf_path, first_page=1, last_page=1)
+    image = images[0]
+
+    # Create a BytesIO object to hold the image data
+    output_bytes = BytesIO()
+
+    # Save the image to the BytesIO object as JPEG
+    image.save(output_bytes, format="JPEG")
+
+    # Get the byte string value
+    metadata["cover"] = output_bytes.getvalue()
+
+    print(f"Extracted text saved to: {output_file}")
+
+    return metadata
 
 
 def extract_text_from_ebook(ebook_path: str, output_file: str) -> dict:
@@ -33,8 +68,8 @@ def extract_text_from_ebook(ebook_path: str, output_file: str) -> dict:
         cover_id = cover[0][1]["content"]
         cover_item = book.get_item_with_id(cover_id)
         assert cover_item
-        cover_image = cover_item.get_content()
-        metadata["cover_image"] = cover_image
+        cover = cover_item.get_content()
+        metadata["cover"] = cover
 
     if os.path.exists(output_file):
         with open(output_file, "r", encoding="utf-8") as file:
@@ -130,7 +165,7 @@ def get_filename_from_path(path: str) -> str:
 
 
 def convert_wav_to_m4b(filename: str, metadata: dict) -> None:
-    wav_file = f"./summaries/{filename}.wav"
+    wav_file = f"./wavs/{filename}.wav"
     m4b_file = f"./audiobooks/{filename}.m4b"
 
     audio = AudioSegment.from_wav(wav_file)
@@ -145,9 +180,9 @@ def convert_wav_to_m4b(filename: str, metadata: dict) -> None:
     tags["\xa9alb"] = metadata.get("title")
     tags["\xa9ART"] = metadata.get("author")
 
-    cover_image = metadata.get("cover_image", None)
-    if cover_image:
-        tags["covr"] = [MP4Cover(cover_image)]
+    cover = metadata.get("cover", None)
+    if cover:
+        tags["covr"] = [MP4Cover(cover)]
 
     tags.save(m4b_file)
 
@@ -163,18 +198,31 @@ def setup_piper(container_id: str) -> None:
     )
 
 
+def get_file_extension(file_path):
+    _, file_extension = os.path.splitext(file_path)
+    return file_extension
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python ebook_to_text.py <ebook_path> [--summarize]")
         return
 
-    ebook_path = sys.argv[1]
-    filename = get_filename_from_path(ebook_path)
+    input_path = sys.argv[1]
+    filename = get_filename_from_path(input_path)
 
     base_dir = "extracts"
     os.makedirs(base_dir, exist_ok=True)
     extract_file = os.path.join(base_dir, f"{filename}.txt")
-    metadata = extract_text_from_ebook(ebook_path, extract_file)
+    ext = get_file_extension(input_path)
+
+    metadata = {}
+    if ext == ".epub":
+        metadata = extract_text_from_ebook(input_path, extract_file)
+    elif ext == ".pdf":
+        metadata = extract_text_from_pdf(input_path, extract_file)
+    else:
+        raise Exception(f"Unsupported file extension: {ext}")
 
     summarize = False
     if len(sys.argv) >= 3 and sys.argv[2] == "--summarize":
