@@ -26,6 +26,7 @@ torch = {version = "*", index = "downloadpytorch"}
 torchvision = {version = "*", index = "downloadpytorch"}
 torchaudio = {version = "*", index = "downloadpytorch"}
 pydub = "*"
+mutagen = "*"
 
 [dev-packages]
 

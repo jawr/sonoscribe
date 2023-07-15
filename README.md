@@ -12,7 +12,8 @@ Stiches together some awesome technologies:
 First install dependencies:
 
 ```
-brew install ffmpeg
+brew tap homebrew-ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-fdk-aac
 ```
 
 Next setup the python environment:
